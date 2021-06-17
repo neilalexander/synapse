@@ -283,8 +283,6 @@ class MatrixTransparentProxyEndpoint:
         proxy = urllib.parse.urlsplit('//' + os.environ["SYNAPSE_USE_PROXY"])
         logger.debug("Connecting to %s:%i", proxy.hostname, proxy.port)
         endpoint = HostnameEndpoint(self._reactor, proxy.hostname, proxy.port)
-        if self._tls_options:
-            endpoint = wrapClientTLS(self._tls_options, endpoint)
         result = await make_deferred_yieldable(
             endpoint.connect(protocol_factory)
         )
