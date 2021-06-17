@@ -87,7 +87,7 @@ class MatrixFederationAgent:
              self._agent = Agent.usingEndpointFactory(
                 self._reactor,
                 MatrixTransparentProxyEndpointFactory(
-                    reactor, tls_client_options_factory, _srv_resolver
+                    reactor, _srv_resolver
                 ),
                 pool=self._pool,
             )
@@ -236,21 +236,16 @@ class MatrixTransparentProxyEndpointFactory:
     def __init__(
         self,
         reactor: IReactorCore,
-        tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         srv_resolver: Optional[SrvResolver],
     ):
         self._reactor = reactor
-        self._tls_client_options_factory = None
-
         if srv_resolver is None:
             srv_resolver = SrvResolver()
-
         self._srv_resolver = srv_resolver
 
     def endpointForURI(self, parsed_uri):
         return MatrixTransparentProxyEndpoint(
             self._reactor,
-            self._tls_client_options_factory,
             self._srv_resolver,
             parsed_uri,
         )
@@ -272,27 +267,11 @@ class MatrixTransparentProxyEndpoint:
     def __init__(
         self,
         reactor: IReactorCore,
-        tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         srv_resolver: SrvResolver,
         parsed_uri: URI,
     ):
         self._reactor = reactor
-
         self._parsed_uri = parsed_uri
-
-        # set up the TLS connection params
-        #
-        # XXX disabling TLS is really only supported here for the benefit of the
-        # unit tests. We should make the UTs cope with TLS rather than having to make
-        # the code support the unit tests.
-
-        if tls_client_options_factory is None:
-            self._tls_options = None
-        else:
-            self._tls_options = tls_client_options_factory.get_options(
-                self._parsed_uri.host
-            )
-
         self._srv_resolver = srv_resolver
 
     def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
