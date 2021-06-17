@@ -165,9 +165,13 @@ async def _cleanup(clock: Clock):
             break
 
         parent = node.get_parent()
+        current_node = node
         node = node.prev_node
         if parent:
             parent.drop_from_cache()
+        else:
+            logger.warning("Found orphaned node")
+            current_node.remove_from_list()
 
         if i % 10000 == 0:
             logger.info("Waiting during drop")
@@ -260,7 +264,8 @@ class _Node:
         self.callbacks = None
 
     def drop_from_cache(self) -> None:
-        self.cache.pop(self.key, None)
+        if not self.cache.pop(self.key, None):
+            self.drop_from_lists()
 
     def drop_from_lists(self) -> None:
         self.list_node.remove_from_list()
@@ -517,10 +522,13 @@ class LruCache(Generic[KT, VT]):
 
         @synchronized
         def cache_clear() -> None:
-            list_root.next_node = list_root
-            list_root.prev_node = list_root
             for node in cache.values():
                 node.run_and_clear_callbacks()
+                node.drop_from_lists()
+
+            list_root.next_node = list_root
+            list_root.prev_node = list_root
+
             cache.clear()
             if size_callback:
                 cached_cache_len[0] = 0
