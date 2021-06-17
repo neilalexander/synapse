@@ -4,10 +4,12 @@ import codecs
 import glob
 import os
 import platform
+import shlex
 import subprocess
 import sys
 
 import jinja2
+import yaml
 
 
 # Utility functions
@@ -250,6 +252,20 @@ running with 'migrate_config'. See the README for more details.
             )
 
         args += ["--config-path", config_path]
+
+    if os.path.isfile("/usr/local/bin/proxy"):
+        config_yaml = open(config_path)
+        parsed_yaml = yaml.load(config_yaml, Loader=yaml.FullLoader)
+        lbargs = [
+            "-local 'http://127.0.0.1:8008'",
+            "-advertise 'http://" + shlex.quote(parsed_yaml["server_name"]) + ":8008'",
+            "-tls-cert " + shlex.quote(parsed_yaml["tls_certificate_path"]),
+            "-tls-key " + shlex.quote(parsed_yaml["tls_private_key_path"]),
+            "-dtls-bind-addr :8448"
+        ]
+        print("Starting low-bandwidth proxy with args " + " ".join(lbargs))
+        os.system("/usr/local/bin/proxy " + " ".join(lbargs) + " &")
+        environ["SYNAPSE_FEDERATION_TRANSPARENT_PROXY"] = "127.0.0.1:8448"
 
     log("Starting synapse with args " + " ".join(args))
 
