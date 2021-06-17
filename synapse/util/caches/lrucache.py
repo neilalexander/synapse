@@ -155,7 +155,7 @@ class _ListNode(Generic[P]):
         return self.parent()
 
 
-GLOBAL_ROOT = _ListNode()
+GLOBAL_ROOT = _ListNode[_Parent]()
 
 
 @wrap_as_background_process("LruCache._cleanup")
