@@ -83,7 +83,7 @@ class MatrixFederationAgent:
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
 
-        if "SYNAPSE_USE_PROXY" in os.environ:
+        if "SYNAPSE_FEDERATION_TRANSPARENT_PROXY" in os.environ:
              self._agent = Agent.usingEndpointFactory(
                 self._reactor,
                 MatrixTransparentProxyEndpointFactory(
@@ -253,7 +253,7 @@ class MatrixTransparentProxyEndpointFactory:
 
 @implementer(IStreamClientEndpoint)
 class MatrixTransparentProxyEndpoint:
-    """An endpoint that uses the proxy server as specified in SYNAPSE_USE_PROXY
+    """An endpoint that uses the proxy server as specified in SYNAPSE_FEDERATION_TRANSPARENT_PROXY
     for all requests. The proxying is transparent for LB.
 
     Args:
@@ -273,16 +273,15 @@ class MatrixTransparentProxyEndpoint:
         self._reactor = reactor
         self._parsed_uri = parsed_uri
         self._srv_resolver = srv_resolver
+        self._proxy = urllib.parse.urlsplit('//' + os.environ["SYNAPSE_FEDERATION_TRANSPARENT_PROXY"])
+        logger.info("Using transparent proxy %s:%i", self._proxy.hostname, self._proxy.port)
 
     def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
         """Implements IStreamClientEndpoint interface"""
-
         return run_in_background(self._do_connect, protocol_factory)
 
     async def _do_connect(self, protocol_factory: IProtocolFactory) -> None:
-        proxy = urllib.parse.urlsplit('//' + os.environ["SYNAPSE_USE_PROXY"])
-        logger.debug("Connecting to %s:%i", proxy.hostname, proxy.port)
-        endpoint = HostnameEndpoint(self._reactor, proxy.hostname, proxy.port)
+        endpoint = HostnameEndpoint(self._reactor, self._proxy.hostname, self._proxy.port)
         result = await make_deferred_yieldable(
             endpoint.connect(protocol_factory)
         )
