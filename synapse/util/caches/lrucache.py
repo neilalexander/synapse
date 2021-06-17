@@ -127,14 +127,18 @@ class _ListNode(Generic[P]):
     def remove_from_list(self):
         prev_node = self.prev_node
         next_node = self.next_node
+
         prev_node.next_node = next_node
         next_node.prev_node = prev_node
+
+        self.next_node = self
+        self.prev_node = self
 
     def move_after(self, root: "_ListNode"):
         self.remove_from_list()
 
         prev_node = root
-        next_node = prev_node.next_node
+        next_node = root.next_node
 
         self.prev_node = prev_node
         self.next_node = next_node
