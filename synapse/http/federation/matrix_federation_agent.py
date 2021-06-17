@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
 import urllib.parse
 from typing import Any, Generator, List, Optional
 
@@ -82,13 +83,22 @@ class MatrixFederationAgent:
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
 
-        self._agent = Agent.usingEndpointFactory(
-            self._reactor,
-            MatrixHostnameEndpointFactory(
-                reactor, tls_client_options_factory, _srv_resolver
-            ),
-            pool=self._pool,
-        )
+        if "SYNAPSE_USE_PROXY" in os.environ:
+             self._agent = Agent.usingEndpointFactory(
+                self._reactor,
+                MatrixTransparentProxyEndpointFactory(
+                    reactor, tls_client_options_factory, _srv_resolver
+                ),
+                pool=self._pool,
+            )
+        else:
+            self._agent = Agent.usingEndpointFactory(
+                self._reactor,
+                MatrixHostnameEndpointFactory(
+                    reactor, tls_client_options_factory, _srv_resolver
+                ),
+                pool=self._pool,
+            )
         self.user_agent = user_agent
 
         if _well_known_resolver is None:
@@ -218,6 +228,88 @@ class MatrixHostnameEndpointFactory:
             self._srv_resolver,
             parsed_uri,
         )
+
+@implementer(IAgentEndpointFactory)
+class MatrixTransparentProxyEndpointFactory:
+    """Factory for MatrixTransparentProxyEndpoint for parsing to an Agent."""
+
+    def __init__(
+        self,
+        reactor: IReactorCore,
+        tls_client_options_factory: Optional[FederationPolicyForHTTPS],
+        srv_resolver: Optional[SrvResolver],
+    ):
+        self._reactor = reactor
+        self._tls_client_options_factory = None
+
+        if srv_resolver is None:
+            srv_resolver = SrvResolver()
+
+        self._srv_resolver = srv_resolver
+
+    def endpointForURI(self, parsed_uri):
+        return MatrixTransparentProxyEndpoint(
+            self._reactor,
+            self._tls_client_options_factory,
+            self._srv_resolver,
+            parsed_uri,
+        )
+
+
+@implementer(IStreamClientEndpoint)
+class MatrixTransparentProxyEndpoint:
+    """An endpoint that uses the proxy server as specified in SYNAPSE_USE_PROXY
+    for all requests. The proxying is transparent for LB.
+
+    Args:
+        reactor: twisted reactor to use for underlying requests
+        tls_client_options_factory:
+            factory to use for fetching client tls options, or none to disable TLS.
+        srv_resolver: The SRV resolver to use
+        parsed_uri: The parsed URI that we're wanting to connect to.
+    """
+
+    def __init__(
+        self,
+        reactor: IReactorCore,
+        tls_client_options_factory: Optional[FederationPolicyForHTTPS],
+        srv_resolver: SrvResolver,
+        parsed_uri: URI,
+    ):
+        self._reactor = reactor
+
+        self._parsed_uri = parsed_uri
+
+        # set up the TLS connection params
+        #
+        # XXX disabling TLS is really only supported here for the benefit of the
+        # unit tests. We should make the UTs cope with TLS rather than having to make
+        # the code support the unit tests.
+
+        if tls_client_options_factory is None:
+            self._tls_options = None
+        else:
+            self._tls_options = tls_client_options_factory.get_options(
+                self._parsed_uri.host
+            )
+
+        self._srv_resolver = srv_resolver
+
+    def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
+        """Implements IStreamClientEndpoint interface"""
+
+        return run_in_background(self._do_connect, protocol_factory)
+
+    async def _do_connect(self, protocol_factory: IProtocolFactory) -> None:
+        proxy = urllib.parse.urlsplit('//' + os.environ["SYNAPSE_USE_PROXY"])
+        logger.debug("Connecting to %s:%i", proxy.hostname, proxy.port)
+        endpoint = HostnameEndpoint(self._reactor, proxy.hostname, proxy.port)
+        if self._tls_options:
+            endpoint = wrapClientTLS(self._tls_options, endpoint)
+        result = await make_deferred_yieldable(
+            endpoint.connect(protocol_factory)
+        )
+        return result
 
 
 @implementer(IStreamClientEndpoint)
