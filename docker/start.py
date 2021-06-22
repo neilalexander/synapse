@@ -253,26 +253,26 @@ running with 'migrate_config'. See the README for more details.
 
         args += ["--config-path", config_path]
 
-    if os.path.isfile("/usr/local/bin/proxy"):
-        # Assumptions:
-        #  - Synapse has a HTTP listener on port TCP/8008 with both 'client'
-        #    and 'federation' enabled
-        #  - The LB proxy has a DTLS listener on port UDP/8448
-        #  - The LB proxy has an outbound HTTP proxy listener on port TCP/8009
-        config_yaml = open(config_path)
-        parsed_yaml = yaml.load(config_yaml, Loader=yaml.FullLoader)
-        proxy_addr = "localhost:8009"
-        lbargs = [
-            "-local http://127.0.0.1:8008",
-            "-tls-cert " + shlex.quote(parsed_yaml["tls_certificate_path"]),
-            "-tls-key " + shlex.quote(parsed_yaml["tls_private_key_path"]),
-            "-dtls-bind-addr :8448",
-            "-proxy-bind-addr " + proxy_addr,
-            #  "-advertise http://" + shlex.quote(parsed_yaml["server_name"]) + ":8008",
-        ]
-        print("Starting low-bandwidth proxy with args " + " ".join(lbargs))
-        os.system("/usr/local/bin/proxy " + " ".join(lbargs) + " &")
-        environ["SYNAPSE_FEDERATION_TRANSPARENT_PROXY"] = proxy_addr
+        if os.path.isfile("/usr/local/bin/proxy"):
+            # Assumptions:
+            #  - Synapse has a HTTP listener on port TCP/8008 with both 'client'
+            #    and 'federation' enabled
+            #  - The LB proxy has a DTLS listener on port UDP/8448
+            #  - The LB proxy has an outbound HTTP proxy listener on port TCP/8009
+            config_yaml = open(config_path)
+            parsed_yaml = yaml.load(config_yaml, Loader=yaml.FullLoader)
+            proxy_addr = "localhost:8009"
+            lbargs = [
+                "-local http://127.0.0.1:8008",
+                "-tls-cert " + shlex.quote(parsed_yaml["tls_certificate_path"]),
+                "-tls-key " + shlex.quote(parsed_yaml["tls_private_key_path"]),
+                "-dtls-bind-addr :8448",
+                "-proxy-bind-addr " + proxy_addr,
+                #  "-advertise http://" + shlex.quote(parsed_yaml["server_name"]) + ":8008",
+            ]
+            print("Starting low-bandwidth proxy with args " + " ".join(lbargs))
+            os.system("/usr/local/bin/proxy " + " ".join(lbargs) + " &")
+            environ["SYNAPSE_FEDERATION_TRANSPARENT_PROXY"] = proxy_addr
 
     log("Starting synapse with args " + " ".join(args))
 
