@@ -266,7 +266,7 @@ running with 'migrate_config'. See the README for more details.
                 "-local http://127.0.0.1:8008",
                 "-tls-cert " + shlex.quote(parsed_yaml["tls_certificate_path"]),
                 "-tls-key " + shlex.quote(parsed_yaml["tls_private_key_path"]),
-                "-dtls-bind-addr :8448",
+                "-dtls-bind-addr :8008",
                 "-proxy-bind-addr " + proxy_addr,
                 #  "-advertise http://" + shlex.quote(parsed_yaml["server_name"]) + ":8008",
             ]
